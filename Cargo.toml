@@ -1,0 +1,47 @@
+[package]
+name = "cgroups-explorer"
+version = "0.1.0"
+edition = "2024"
+description = "A crate to explore cgroups and gather metrics"
+publish = true
+license = "MIT"
+repository = "https://github.com/oguzbilgener/cgroups-explorer"
+readme = "README.md"
+keywords = ["cgroups", "metrics", "explorer", "containers", "linux"]
+categories = ["os::linux-apis"]
+authors = ["Oguz Bilgener <oguz@bilgener.me>"]
+documentation = "https://docs.rs/cgroups-explorer"
+
+[lib]
+name = "cgroups_explorer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "explorer-demo"
+path = "src/bin/explorer-demo.rs"
+
+
+[features]
+serde = ["cgroups-rs/serde"]
+
+[profile.release]
+lto = true
+strip = "symbols"
+
+[dependencies]
+cgroups-rs = { version = "0.3.4" }
+derive_builder = "0.20.2"
+glob = "0.3.1"
+walkdir = "2.5.0"
+
+[dev-dependencies]
+anyhow = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+pedantic = "warn"
+cargo = "warn"
+all = "warn"
