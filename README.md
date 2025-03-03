@@ -1,6 +1,7 @@
 # cgroups-explorer
 
-![Crates.io Version](https://img.shields.io/crates/v/:cgroups-explorer)
+![Crates.io Version](https://img.shields.io/crates/v/cgroups-explorer)
+[![Tests](https://github.com/oguzbilgener/cgroups-explorer/actions/workflows/build.yml/badge.svg)](https://github.com/oguzbilgener/cgroups-explorer/actions/workflows/build.yml)
 
 A crate for exploring control groups v1 and v2 on Linux.
 

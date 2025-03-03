@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{HashSet, hash_set},
+    path::{Path, PathBuf},
+};
 
 use cgroups_rs::{
     Cgroup, Hierarchy,
@@ -33,11 +36,14 @@ pub struct Explorer {
 }
 
 /// An iterator over cgroups in the system that match the globs.
-pub struct CgroupsIterator {
+struct CgroupsV2Iterator {
     walker: walkdir::IntoIter,
     include: Vec<glob::Pattern>,
-    hierarchy: Box<dyn Hierarchy>,
     base_path: PathBuf,
+}
+
+struct CgroupsV1Iterator {
+    discovered: hash_set::IntoIter<PathBuf>,
 }
 
 impl Explorer {
@@ -63,32 +69,67 @@ impl Explorer {
         }
     }
 
-    fn hierarchy(&self) -> Box<dyn Hierarchy> {
+    /// Create an iterator over all cgroups in the system, based on the criteria.
+    #[must_use]
+    pub fn iter_cgroups(&self) -> Box<dyn Iterator<Item = Cgroup>> {
         if self.hierarchy.v2() {
-            Box::new(V2::new())
+            Box::new(self.iter_cgroups_v2())
         } else {
-            Box::new(V1::new())
+            Box::new(self.iter_cgroups_v1())
         }
     }
 
-    /// Create an iterator over all cgroups in the system, based on the criteria.
-    #[must_use]
-    pub fn iter_cgroups(&self) -> CgroupsIterator {
+    fn iter_cgroups_v2(&self) -> CgroupsV2Iterator {
         let base_path = self.hierarchy.root();
         let walker = WalkDir::new(base_path.clone())
             .min_depth(1)
             .sort_by_file_name()
             .into_iter();
-        CgroupsIterator {
+        CgroupsV2Iterator {
             walker,
             include: self.include.clone(),
-            hierarchy: self.hierarchy(),
             base_path,
+        }
+    }
+
+    fn iter_cgroups_v1(&self) -> CgroupsV1Iterator {
+        let hierarchy = V1::new();
+        let subystems = hierarchy.subsystems();
+        let base_path = hierarchy.root();
+
+        let mut matching_rel_paths = HashSet::new();
+        for subsystem in subystems {
+            let name = subsystem.controller_name();
+            let walker = WalkDir::new(base_path.join(&name))
+                .min_depth(1)
+                .sort_by_file_name()
+                .into_iter();
+            let base_controller_path = base_path.join(name);
+            for entry in walker {
+                let Ok(entry) = entry else { continue };
+                let path = entry.path();
+                if !entry.file_type().is_dir() {
+                    continue;
+                }
+                let Ok(relative_path) = path.strip_prefix(&base_controller_path) else {
+                    continue;
+                };
+                if relative_path.components().count() == 0 {
+                    continue;
+                }
+                if self.include.is_empty() || path_matches_include(&self.include, relative_path) {
+                    matching_rel_paths.insert(relative_path.to_path_buf());
+                }
+            }
+        }
+
+        CgroupsV1Iterator {
+            discovered: matching_rel_paths.into_iter(),
         }
     }
 }
 
-impl Iterator for CgroupsIterator {
+impl Iterator for CgroupsV2Iterator {
     type Item = Cgroup;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -106,10 +147,10 @@ impl Iterator for CgroupsIterator {
                     if relative_path.components().count() == 0 {
                         continue;
                     }
-                    if !self.matches_include(relative_path) {
+                    if !path_matches_include(&self.include, relative_path) {
                         continue;
                     }
-                    return Some(Cgroup::load(self.hierarchy(), path));
+                    return Some(Cgroup::load(Box::new(V2::new()), relative_path));
                 }
                 Some(Err(_e)) => return None,
                 None => return None,
@@ -118,24 +159,22 @@ impl Iterator for CgroupsIterator {
     }
 }
 
-impl CgroupsIterator {
-    fn matches_include(&self, path: &Path) -> bool {
-        if self.include.is_empty() {
-            return true;
-        }
-        let path_str = path.to_string_lossy();
-        self.include
-            .iter()
-            .any(|pattern| pattern.matches(&path_str))
-    }
+impl Iterator for CgroupsV1Iterator {
+    type Item = Cgroup;
 
-    fn hierarchy(&self) -> Box<dyn Hierarchy> {
-        if self.hierarchy.v2() {
-            Box::new(V2::new())
-        } else {
-            Box::new(V1::new())
-        }
+    fn next(&mut self) -> Option<Self::Item> {
+        self.discovered
+            .next()
+            .map(|path| Cgroup::load(Box::new(V1::new()), path))
     }
+}
+
+fn path_matches_include(include: &[glob::Pattern], path: &Path) -> bool {
+    if include.is_empty() {
+        return true;
+    }
+    let path_str = path.to_string_lossy();
+    include.iter().any(|pattern| pattern.matches(&path_str))
 }
 
 fn parse_include(include: Vec<String>) -> Result<Vec<glob::Pattern>, ExplorerBuilderError> {
