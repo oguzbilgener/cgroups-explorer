@@ -33,12 +33,21 @@ pub struct Explorer {
     /// The globs to include in the exploration.
     #[builder(field(ty = "Vec<String>", build = "parse_include(self.include)?"))]
     include: Vec<glob::Pattern>,
+    /// The regexes to match group names against.
+    #[cfg_attr(
+        feature = "regex",
+        builder(field(ty = "Vec<String>", build = "parse_include_regex(self.include_regex)?"))
+    )]
+    #[cfg(feature = "regex")]
+    include_regex: Vec<regex::Regex>,
 }
 
 /// An iterator over cgroups in the system that match the globs.
 struct CgroupsV2Iterator {
     walker: walkdir::IntoIter,
     include: Vec<glob::Pattern>,
+    #[cfg(feature = "regex")]
+    include_regex: Vec<regex::Regex>,
     base_path: PathBuf,
 }
 
@@ -88,6 +97,8 @@ impl Explorer {
         CgroupsV2Iterator {
             walker,
             include: self.include.clone(),
+            #[cfg(feature = "regex")]
+            include_regex: self.include_regex.clone(),
             base_path,
         }
     }
@@ -117,7 +128,13 @@ impl Explorer {
                 if relative_path.components().count() == 0 {
                     continue;
                 }
-                if self.include.is_empty() || path_matches_include(&self.include, relative_path) {
+                #[cfg(feature = "regex")]
+                let should_include = path_matches_include(&self.include, relative_path)
+                    || path_matches_include_regex(&self.include_regex, relative_path);
+                #[cfg(not(feature = "regex"))]
+                let should_include = path_matches_include(&self.include, relative_path);
+
+                if should_include {
                     matching_rel_paths.insert(relative_path.to_path_buf());
                 }
             }
@@ -150,6 +167,10 @@ impl Iterator for CgroupsV2Iterator {
                     if !path_matches_include(&self.include, relative_path) {
                         continue;
                     }
+                    #[cfg(feature = "regex")]
+                    if !path_matches_include_regex(&self.include_regex, relative_path) {
+                        continue;
+                    }
                     return Some(Cgroup::load(Box::new(V2::new()), relative_path));
                 }
                 Some(Err(_e)) => return None,
@@ -177,6 +198,15 @@ fn path_matches_include(include: &[glob::Pattern], path: &Path) -> bool {
     include.iter().any(|pattern| pattern.matches(&path_str))
 }
 
+#[cfg(feature = "regex")]
+fn path_matches_include_regex(include: &[regex::Regex], path: &Path) -> bool {
+    if include.is_empty() {
+        return true;
+    }
+    let path_str = path.to_string_lossy();
+    include.iter().any(|pattern| pattern.is_match(&path_str))
+}
+
 fn parse_include(include: Vec<String>) -> Result<Vec<glob::Pattern>, ExplorerBuilderError> {
     if include.is_empty() {
         Ok(Vec::new())
@@ -185,6 +215,21 @@ fn parse_include(include: Vec<String>) -> Result<Vec<glob::Pattern>, ExplorerBui
             .into_iter()
             .map(|include| {
                 glob::Pattern::new(&include)
+                    .map_err(|e| ExplorerBuilderError::ValidationError(e.to_string()))
+            })
+            .collect()
+    }
+}
+
+#[cfg(feature = "regex")]
+fn parse_include_regex(include: Vec<String>) -> Result<Vec<regex::Regex>, ExplorerBuilderError> {
+    if include.is_empty() {
+        Ok(Vec::new())
+    } else {
+        include
+            .into_iter()
+            .map(|include| {
+                regex::Regex::new(&include)
                     .map_err(|e| ExplorerBuilderError::ValidationError(e.to_string()))
             })
             .collect()
