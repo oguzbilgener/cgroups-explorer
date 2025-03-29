@@ -36,7 +36,7 @@ pub struct Explorer {
     /// The regexes to match group names against.
     #[cfg_attr(
         feature = "regex",
-        builder(field(ty = "Vec<String>", build = "parse_include_regex(self.include_regex)?"))
+        builder(try_setter, setter(custom, name = "include_regex_str"))
     )]
     #[cfg(feature = "regex")]
     include_regex: Vec<regex::Regex>,
@@ -146,6 +146,34 @@ impl Explorer {
     }
 }
 
+impl ExplorerBuilder {
+    /// The regexes to match group names against.
+    ///
+    /// # Errors
+    /// If any of the regexes are invalid, a `ValidationError` is returned.
+    #[cfg(feature = "regex")]
+    pub fn include_regex_str<S: AsRef<str>>(
+        self,
+        include: &[S],
+    ) -> Result<Self, ExplorerBuilderError> {
+        let include_regex = parse_include_regex(include)
+            .map_err(|e| ExplorerBuilderError::ValidationError(e.to_string()))?;
+        Ok(self.include_regex(include_regex))
+    }
+
+    /// The regexes to match group names against.
+    #[cfg(feature = "regex")]
+    #[must_use]
+    pub fn include_regex(mut self, include: Vec<regex::Regex>) -> Self {
+        if let Some(include_regex) = &mut self.include_regex {
+            include_regex.extend(include);
+        } else {
+            self.include_regex = Some(include);
+        }
+        self
+    }
+}
+
 impl Iterator for CgroupsV2Iterator {
     type Item = Cgroup;
 
@@ -222,14 +250,16 @@ fn parse_include(include: Vec<String>) -> Result<Vec<glob::Pattern>, ExplorerBui
 }
 
 #[cfg(feature = "regex")]
-fn parse_include_regex(include: Vec<String>) -> Result<Vec<regex::Regex>, ExplorerBuilderError> {
+fn parse_include_regex<S: AsRef<str>>(
+    include: &[S],
+) -> Result<Vec<regex::Regex>, ExplorerBuilderError> {
     if include.is_empty() {
         Ok(Vec::new())
     } else {
         include
-            .into_iter()
+            .iter()
             .map(|include| {
-                regex::Regex::new(&include)
+                regex::Regex::new(include.as_ref())
                     .map_err(|e| ExplorerBuilderError::ValidationError(e.to_string()))
             })
             .collect()

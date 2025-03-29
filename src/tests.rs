@@ -68,7 +68,7 @@ fn explore_created_cgroups_regex() -> anyhow::Result<()> {
         .unwrap();
 
     let explorer = Explorer::detect_version()
-        .include_regex(vec!["^test_.*?_explorer[0-9]$".to_string()])
+        .include_regex_str(&["^test_.*?_explorer[0-9]$"])?
         .build()?;
     let found = explorer
         .iter_cgroups()
