@@ -36,7 +36,7 @@ pub struct Explorer {
     /// The regexes to match group names against.
     #[cfg_attr(
         feature = "regex",
-        builder(try_setter, setter(custom, name = "include_regex_str"))
+        builder(default, try_setter, setter(custom, name = "include_regex_str"))
     )]
     #[cfg(feature = "regex")]
     include_regex: Vec<regex::Regex>,
