@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let explorer = builder.build()?;
     for cgroup in explorer.iter_cgroups() {
         let memory_usage =
-            if let Some(memory) = cgroup.controller_of::<cgroups_rs::memory::MemController>() {
+            if let Some(memory) = cgroup.controller_of::<cgroups_rs::fs::memory::MemController>() {
                 memory.memory_stat().usage_in_bytes
             } else {
                 0

@@ -30,7 +30,7 @@ lto = true
 strip = "symbols"
 
 [dependencies]
-cgroups-rs = { version = "0.3.4" }
+cgroups-rs = { version = "0.5.1" }
 derive_builder = "0.20.2"
 glob = "0.3.1"
 walkdir = "2.5.0"
@@ -48,3 +48,6 @@ missing_docs = "warn"
 pedantic = "warn"
 cargo = "warn"
 all = "warn"
+
+[patch.crates-io]
+cgroups-rs = { git = "https://github.com/oguzbilgener/cgroups-rs", rev = "99f58507e120f19c41c27447fc9feee287c614de" }

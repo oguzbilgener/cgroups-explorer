@@ -1,4 +1,4 @@
-use cgroups_rs::{
+use cgroups_rs::fs::{
     Cgroup, cgroup_builder::CgroupBuilder, cpu::CpuController, hierarchies::auto,
     memory::MemController,
 };
@@ -9,7 +9,7 @@ use crate::explorer::Explorer;
 #[test]
 #[serial]
 fn explore_created_cgroups() -> anyhow::Result<()> {
-    let h = cgroups_rs::hierarchies::auto();
+    let h = cgroups_rs::fs::hierarchies::auto();
 
     let cgroup_name = "test_cgroup_explorer";
     let existing_cgroup = Cgroup::load(auto(), auto().root().join(cgroup_name));
@@ -50,7 +50,7 @@ fn explore_created_cgroups() -> anyhow::Result<()> {
 #[serial]
 #[cfg(feature = "regex")]
 fn explore_created_cgroups_regex() -> anyhow::Result<()> {
-    let h = cgroups_rs::hierarchies::auto();
+    let h = cgroups_rs::fs::hierarchies::auto();
 
     let cgroup_name = "test_cgroup_explorer2";
     let existing_cgroup = Cgroup::load(auto(), auto().root().join(cgroup_name));

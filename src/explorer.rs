@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use cgroups_rs::{
+use cgroups_rs::fs::{
     Cgroup, Hierarchy,
     hierarchies::{V1, V2, is_cgroup2_unified_mode},
 };
