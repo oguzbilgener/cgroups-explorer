@@ -1,6 +1,6 @@
 [package]
 name = "cgroups-explorer"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2024"
 description = "A crate to explore cgroups and gather metrics"
 publish = true
@@ -49,5 +49,3 @@ pedantic = "warn"
 cargo = "warn"
 all = "warn"
 
-[patch.crates-io]
-cgroups-rs = { git = "https://github.com/oguzbilgener/cgroups-rs", rev = "99f58507e120f19c41c27447fc9feee287c614de" }
