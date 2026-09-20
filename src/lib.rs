@@ -1,5 +1,7 @@
 //! # cgroups-explorer
 
+#![allow(clippy::multiple_crate_versions)]
+
 #[doc = include_str!("../README.md")]
 mod explorer;
 

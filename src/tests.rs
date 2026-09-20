@@ -7,6 +7,19 @@ use serial_test::serial;
 use crate::explorer::Explorer;
 
 #[test]
+fn explore_root_cgroup() -> anyhow::Result<()> {
+    let explorer = Explorer::detect_version().include_root(true).build()?;
+    let root = explorer
+        .iter_cgroups()
+        .find(|cgroup| cgroup.path().is_empty())
+        .expect("root cgroup not found");
+
+    assert_eq!(root.path(), "");
+
+    Ok(())
+}
+
+#[test]
 #[serial]
 fn explore_created_cgroups() -> anyhow::Result<()> {
     let h = cgroups_rs::fs::hierarchies::auto();

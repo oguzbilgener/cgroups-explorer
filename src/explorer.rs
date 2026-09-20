@@ -33,6 +33,9 @@ pub struct Explorer {
     /// The globs to include in the exploration.
     #[builder(field(ty = "Vec<String>", build = "parse_include(self.include)?"))]
     include: Vec<glob::Pattern>,
+    /// Include the root control group in the exploration.
+    #[builder(default)]
+    include_root: bool,
     /// The regexes to match group names against.
     #[cfg_attr(
         feature = "regex",
@@ -46,6 +49,7 @@ pub struct Explorer {
 struct CgroupsV2Iterator {
     walker: walkdir::IntoIter,
     include: Vec<glob::Pattern>,
+    include_root: bool,
     #[cfg(feature = "regex")]
     include_regex: Vec<regex::Regex>,
     base_path: PathBuf,
@@ -97,6 +101,7 @@ impl Explorer {
         CgroupsV2Iterator {
             walker,
             include: self.include.clone(),
+            include_root: self.include_root,
             #[cfg(feature = "regex")]
             include_regex: self.include_regex.clone(),
             base_path,
@@ -109,6 +114,9 @@ impl Explorer {
         let base_path = hierarchy.root();
 
         let mut matching_rel_paths = HashSet::new();
+        if self.include_root {
+            matching_rel_paths.insert(PathBuf::new());
+        }
         for subsystem in subystems {
             let name = subsystem.controller_name();
             let walker = WalkDir::new(base_path.join(&name))
@@ -178,6 +186,11 @@ impl Iterator for CgroupsV2Iterator {
     type Item = Cgroup;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.include_root {
+            self.include_root = false;
+            return Some(Cgroup::load(Box::new(V2::new()), ""));
+        }
+
         loop {
             let entry = self.walker.next();
             match entry {
